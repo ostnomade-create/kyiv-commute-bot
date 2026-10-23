@@ -233,10 +233,6 @@ def handle_incoming_message(msg: dict):
     if text.startswith("/start") or text.startswith("/help"):
         welcome = (
             "👋 <b>Привіт! Я ваш особистий київський помічник.</b>\n\n"
-            "🚗 <b>Затори та навігація:</b>\n"
-            "• Щоранку о <b>07:00</b> — перевірка заторів на роботу\n"
-            "• Щовечора о <b>17:45</b> — перевірка заторів додому\n"
-            "• Натисніть <b>«🚗 Затори зараз»</b> у будь-який момент\n\n"
             "⏰ <b>Розумні нагадування людською мовою:</b>\n"
             "Просто напишіть мені будь-яку фразу, наприклад:\n"
             "• <i>Нагадай на 15:00</i>\n"
@@ -244,6 +240,9 @@ def handle_incoming_message(msg: dict):
             "• <i>Нагадай випити ліки через 40 хв</i>\n"
             "• <i>Нагадай завтра о 10:30 подзвонити лікарю</i>\n"
             "• <i>через 15 хвилин вимкнути духовку</i>\n\n"
+            "🚗 <b>Затори та навігація (на вимогу):</b>\n"
+            "• Натисніть кнопку <b>«🚗 Затори зараз»</b> у будь-який момент\n"
+            "• Або швидкі кнопки: <b>«🌅 На роботу»</b> / <b>«🌇 Додому»</b>\n\n"
             "📋 <b>Керування нагадуваннями:</b>\n"
             "• <b>«📋 Мої нагадування»</b> або <code>/list</code>\n"
             "• <code>/del ID</code> — скасувати нагадування"
@@ -294,17 +293,16 @@ def handle_incoming_message(msg: dict):
 
 def reminder_scheduler_loop():
     """
-    Окремий незалежний потік перевірки нагадувань та щоденного розкладу поїздок.
+    Окремий незалежний потік перевірки нагадувань.
     Працює щосекунди і ніколи не блокується довгими запитами до мережі.
     """
     logger.info("⏱ Фоновий потік планувальника запущено.")
-    last_commute_minute = {"key": None}
 
     while True:
         try:
             now = datetime.now(KYIV)
 
-            # 1. Перевіряємо та надсилаємо нагадування, час яких настав
+            # Перевіряємо та надсилаємо нагадування, час яких настав
             due_items = db.get_due_reminders(now)
             for row in due_items:
                 chat_id = row["chat_id"]
@@ -321,28 +319,6 @@ def reminder_scheduler_loop():
                 if success:
                     db.mark_as_sent(rem_id)
                     logger.info(f"✅ Нагадування #{rem_id} надіслано вчасно користувачу {chat_id}")
-
-            # 2. Перевіряємо розклад заторів (07:00 та 17:45 по буднях)
-            weekday = now.weekday()  # 0: Monday, ..., 4: Friday
-            current_hh_mm = now.strftime("%H:%M")
-            minute_key = f"{now.strftime('%Y-%m-%d')}_{current_hh_mm}"
-
-            if weekday < 5 and minute_key != last_commute_minute.get("key"):
-                if current_hh_mm == "07:00":
-                    logger.info("⏰ 07:00 ранку! Запуск ранкового звіту поїздок...")
-                    last_commute_minute["key"] = minute_key
-                    threading.Thread(
-                        target=lambda: asyncio.run(run_commute_check(direction="morning")),
-                        daemon=True,
-                    ).start()
-
-                elif current_hh_mm == "17:45":
-                    logger.info("⏰ 17:45 вечора! Запуск вечірнього звіту поїздок...")
-                    last_commute_minute["key"] = minute_key
-                    threading.Thread(
-                        target=lambda: asyncio.run(run_commute_check(direction="evening")),
-                        daemon=True,
-                    ).start()
 
         except Exception as e:
             logger.error(f"Помилка в планувальнику: {e}")
