@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: kyiv-commute-reminder-bot
+    env: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TIMEZONE
+        value: Europe/Kyiv
+      - key: PORT
+        value: 10000
