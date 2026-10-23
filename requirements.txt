@@ -1,5 +1,5 @@
-WazeRouteCalculator>=0.12
+pywaze>=1.2.4
+curl-cffi>=0.13.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 pytz>=2024.1
-schedule>=1.2.0
