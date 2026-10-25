@@ -158,59 +158,64 @@ def get_brsm_stations() -> List[dict]:
     return FALLBACK_KYIV_STATIONS
 
 
-def find_nearest_stations(
-    lat: float, lon: float, count: int = 2
-) -> List[Tuple[float, dict]]:
-    """Знаходить найближчі АЗС БРСМ до заданих координат."""
+ZHUKOVSKOHO_STATION = {
+    "id": 37,
+    "city": "Київ",
+    "address": "вул. Василя Жуковського, 22",
+    "lat": 50.398273,
+    "lng": 30.489777,
+}
+
+
+def get_zhukovskoho_station_status() -> dict:
+    """Отримує актуальний статус наявності пального на АЗК по вул. Жуковського, 22."""
     stations = get_brsm_stations()
-    dist_list = []
     for s in stations:
-        d = haversine(lat, lon, s["lat"], s["lng"])
-        dist_list.append((d, s))
-    dist_list.sort(key=lambda x: x[0])
-    return dist_list[:count]
+        if s.get("id") == 37 or "жуковськ" in s.get("address", "").lower():
+            return s
+    return {
+        "id": 37,
+        "city": "Київ",
+        "address": "вул. Василя Жуковського, 22",
+        "lat": 50.398273,
+        "lng": 30.489777,
+        "has_fuel": True,
+    }
 
 
 def format_brsm_fuel_report() -> Tuple[str, List[List[dict]]]:
-    """Форматує красиве повідомлення для Telegram з цінами та найближчими АЗС."""
+    """Форматує сфокусоване повідомлення для Telegram суто по АЗК на вул. Жуковського."""
     prices = get_brsm_prices()
-    near_home = find_nearest_stations(HOME_COORDS[0], HOME_COORDS[1], count=1)
-    near_work = find_nearest_stations(WORK_COORDS[0], WORK_COORDS[1], count=1)
+    station = get_zhukovskoho_station_status()
+
+    dist = haversine(
+        HOME_COORDS[0], HOME_COORDS[1], station["lat"], station["lng"]
+    )
+    status_str = (
+        "🟢 <b>Пальне в наявності</b>"
+        if station.get("has_fuel", True)
+        else "⚠️ <b>Тимчасово немає</b>"
+    )
 
     lines = [
-        "⛽ <b>БРСМ-Нафта • Моніторинг цін та АЗК</b>",
-        "📍 <i>Місто: Київ</i>",
+        "⛽ <b>БРСМ-Нафта • АЗК #37 (вул. Жуковського, 22)</b>",
+        f"📍 <i>Голосіївський р-н ({dist:.1f} км від дому, ~3 хв)</i>",
+        f"Статус: {status_str}",
         "",
-        "💰 <b>Актуальні ціни на стелі:</b>",
+        "💰 <b>Ціни на стелі:</b>",
         f"• <b>Бензин А-95:</b> <code>{prices.get('A95', '87.98')} грн/л</code>",
         f"• <b>Дизель (ДП):</b> <code>{prices.get('DP', '100.98')} грн/л</code>",
         f"• <b>Газ (LPG):</b> <code>{prices.get('GAS', '50.99')} грн/л</code>",
-        "",
-        "🛣 <b>Найближчі АЗК до вашого маршруту:</b>",
     ]
 
-    inline_keyboard = []
+    waze_url = f"https://waze.com/ul?ll={station['lat']},{station['lng']}&navigate=yes"
+    gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={station['lat']},{station['lng']}&travelmode=driving"
 
-    if near_home:
-        d, s = near_home[0]
-        status = "✅ Пальне в наявності" if s["has_fuel"] else "⚠️ Тимчасово немає"
-        addr = f"{s['address']} {s['building']}".strip()
-        lines.append(f"🏠 <b>Біля дому ({d:.1f} км):</b>")
-        lines.append(f"   АЗК #{s['id']} ({addr})")
-        lines.append(f"   Статус: {status}\n")
-
-        waze_url = f"https://waze.com/ul?ll={s['lat']},{s['lng']}&navigate=yes"
-        inline_keyboard.append([{"text": f"🚗 Waze до АЗК #{s['id']} (Дім)", "url": waze_url}])
-
-    if near_work:
-        d, s = near_work[0]
-        status = "✅ Пальне в наявності" if s["has_fuel"] else "⚠️ Тимчасово немає"
-        addr = f"{s['address']} {s['building']}".strip()
-        lines.append(f"🏢 <b>У бік роботи ({d:.1f} км):</b>")
-        lines.append(f"   АЗК #{s['id']} ({addr})")
-        lines.append(f"   Статус: {status}\n")
-
-        waze_url = f"https://waze.com/ul?ll={s['lat']},{s['lng']}&navigate=yes"
-        inline_keyboard.append([{"text": f"🚗 Waze до АЗК #{s['id']} (Робота)", "url": waze_url}])
+    inline_keyboard = [
+        [
+            {"text": "🚗 Waze до АЗК (Жуковського)", "url": waze_url},
+            {"text": "🗺 Google Maps", "url": gmaps_url},
+        ]
+    ]
 
     return "\n".join(lines), inline_keyboard
