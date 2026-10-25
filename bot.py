@@ -26,6 +26,7 @@ from commute import run_commute_check
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TIMEZONE
 import db
 from reminder_parser import parse_reminder
+from brsm import format_brsm_fuel_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,8 +40,8 @@ API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 MAIN_KEYBOARD = {
     "keyboard": [
-        [{"text": "🚗 Затори зараз"}, {"text": "📋 Мої нагадування"}],
-        [{"text": "🌅 На роботу"}, {"text": "🌇 Додому"}],
+        [{"text": "🚗 Затори зараз"}, {"text": "⛽ Пальне БРСМ"}],
+        [{"text": "📋 Мої нагадування"}, {"text": "🌅 На роботу"}, {"text": "🌇 Додому"}],
     ],
     "resize_keyboard": True,
 }
@@ -243,11 +244,20 @@ def handle_incoming_message(msg: dict):
             "🚗 <b>Затори та навігація (на вимогу):</b>\n"
             "• Натисніть кнопку <b>«🚗 Затори зараз»</b> у будь-який момент\n"
             "• Або швидкі кнопки: <b>«🌅 На роботу»</b> / <b>«🌇 Додому»</b>\n\n"
+            "⛽ <b>БРСМ-Нафта:</b>\n"
+            "• Натисніть <b>«⛽ Пальне БРСМ»</b> для перегляду актуальних цін та наявності на АЗК біля маршруту\n\n"
             "📋 <b>Керування нагадуваннями:</b>\n"
             "• <b>«📋 Мої нагадування»</b> або <code>/list</code>\n"
             "• <code>/del ID</code> — скасувати нагадування"
         )
         send_message(chat_id, welcome, reply_markup=MAIN_KEYBOARD)
+        return
+
+    # Перевірка цін та АЗК БРСМ
+    if text in ["⛽ Пальне БРСМ", "/brsm", "/fuel", "брсм", "пальне", "бензин", "газ"]:
+        report_text, buttons = format_brsm_fuel_report()
+        reply_markup = {"inline_keyboard": buttons} if buttons else None
+        send_message(chat_id, report_text, reply_markup=reply_markup)
         return
 
     # Кнопки заторів
